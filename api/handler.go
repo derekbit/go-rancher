@@ -6,6 +6,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
+	"github.com/mitchellh/copystructure"
 	"github.com/rancher/go-rancher/client"
 )
 
@@ -82,11 +83,17 @@ func VersionHandler(schemas *client.Schemas, version string) http.Handler {
 func SchemasHandler(schemas *client.Schemas) http.Handler {
 	return ApiHandler(schemas, http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		apiContext := GetApiContext(r)
-		schemasCopy := *schemas
+		copy, err := copystructure.Copy(schemas)
+		if err != nil {
+			logrus.WithField("err", err).Errorf("Failed to deepcopy schemas")
+			rw.WriteHeader(500)
+			return
+		}
+		schemasCopy := copy.(*client.Schemas)
 		for i := range schemasCopy.Data {
 			populateSchema(apiContext, &schemasCopy.Data[i])
 		}
-		apiContext.Write(&schemasCopy)
+		apiContext.Write(schemasCopy)
 	}))
 }
 
